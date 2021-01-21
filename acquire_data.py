@@ -18,8 +18,9 @@ def acquire_imu():
     try:
         while True:
             data = dev.read()
-            imu_data.append(data)
-            print(data[1][0], "\t", data[13][0], "\t", data[28][0], "\t", data[32][0])
+            imu_data.append(np.concatenate((data[9:15], data[27:33], data[36:42],
+                            data[45:51], data[54:60]), axis=0))
+            # print(data[1][0], "\t", data[13][0], "\t", data[28][0], "\t", data[32][0])
     except KeyboardInterrupt:
         dev.stop()
         print('Data acquisition stopped')
