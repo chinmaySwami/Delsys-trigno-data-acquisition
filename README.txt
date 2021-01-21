@@ -10,5 +10,7 @@ acquire_data.py : This program reads the data steam from the delsys trigno contr
 
 trigno_demo.py : This program plots the data being received from the delsys sensors in realttime. Currently I am only plotting the X, Y and Z axis of the accelerometer. A separate thread is created to just acquire the data and the main thread is used to plot the acquired data. Matplotlib's FuncAnimation is used for plotting.
 
+Please note that this is for Delsys Trigno Avanti sensors and cannot be used with other sensors. Kindly refer to the delsys SDK documentation for modifying the pytrigno.py file as per the type of sensor being used.
+
 
 
