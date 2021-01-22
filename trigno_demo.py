@@ -4,15 +4,27 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import threading
-from scipy.signal import butter, filtfilt
+from scipy.signal import butter, filtfilt, lfilter_zi, lfilter
 
 
-def smooth_data(data):
+def create_butterworth_filter():
     nyq = 0.5 * sampling_frequency
     low = lowCutoff / nyq
     b = butter(filterOrderIMU, low, btype='low', output='ba')
-    smoothed_data = filtfilt(b[0], b[1], data, method="gust")
-    return smoothed_data
+    z = lfilter_zi(b[0], b[1])
+    return b, z
+
+
+def smooth_data(data, zi):
+    #  Lowpass filter
+    # smoothed_data, zi = lfilter(b[0], b[1], [data], zi=zi)
+
+    # Bujtterworth Filter
+    smoothed_data = filtfilt(b[0], b[1], [data], method="gust")
+
+    zi = zi
+    # smoothed_data = filtfilt(b[0], b[1], data, method='gust', irlen=2)
+    return smoothed_data[0]
 
 
 def check_accel(host):
@@ -70,7 +82,7 @@ def check_accel_thread_filtered(host):
     while True:
         data = dev.read()
         xs.append(data[0][0])
-        ys.append(smooth_data(data[0][0]))
+        ys.append(smooth_data(data[0][0], zi))
         zs.append(data[2][0])
 
 
@@ -107,6 +119,7 @@ lowCutoff = 1
 avg_mean_training = []
 avg_std_training = []
 
+b, zi = create_butterworth_filter()
 dev = create_connection_accel('localhost')
 
 # Non filtered data
@@ -117,7 +130,7 @@ acquire_data_thread = threading.Thread(target=check_accel_thread_filtered, args=
 acquire_data_thread.daemon = True
 acquire_data_thread.start()
 
-ani = animation.FuncAnimation(fig, animate, fargs=(xs, ys,), interval=10)
+ani = animation.FuncAnimation(fig, animate, fargs=(), interval=10)
 plt.show()
 
 
