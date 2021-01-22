@@ -19,7 +19,6 @@ def smooth_data(data, zi):
     #  Lowpass filter
     smoothed_data, z = lfilter(b[0], b[1], [data], zi=zi)
     zi = z
-
     return smoothed_data[0]
 
 
@@ -40,6 +39,11 @@ def check_accel(host):
         print(data[10][0], "\t", data[13][0], "\t", data[28][0], "\t", data[32][0])
         # print("Frame No: ", i, "\t", data[10][0], "\t", data[13][0], "\t", data[28][0], "\t", data[32][0])
     dev.stop()
+
+
+def normalize_data(data):
+    n_data = (np.array([data]) - avg_mean_training)/avg_std_training
+    return n_data
 
 
 def create_connection_accel(host):
@@ -77,43 +81,29 @@ def check_accel_thread_filtered(host):
     print("Connection established::")
     while True:
         data = dev.read()
-        xs.append(data[4][0])
-        ys.append(smooth_data(data[4][0], zi))
-        zs.append(data[2][0])
+        filtered = smooth_data(data[12][0], zi)
+        norm = normalize_data(filtered)
+        xs.append(data[12][0])
+        ys.append(filtered)
+        zs.append(norm[0])
 
 
 def animate(i):
     if ys:
         # data = dev.read()
         # ys.append(data[1][0])
-        print(xs[-1], "\t", ys[-1])
+        print(xs[-1], "\t", ys[-1], "\t", zs[-1])
         # ys = ys[-100:]
         # Draw x and y lists
-        xss = xs[-200:]
-        yss = ys[-200:]
-        zss = zs[-200:]
+        xss = xs[-500:]
+        yss = ys[-500:]
+        zss = zs[-500:]
         ax.clear()
         ay.clear()
         az.clear()
         ax.plot(xss)
         ay.plot(yss)
         az.plot(zss)
-
-
-def animate_filtered(i):
-    if ys:
-        # data = dev.read()
-        # ys.append(data[1][0])
-        print(xs[-1], "\t", ys[-1])
-        # ys = ys[-100:]
-        # Draw x and y lists
-        xss = xs[-200:]
-        yss = ys[-200:]
-        ax.clear()
-        ay.clear()
-        ax.plot(xss)
-        ay.plot(yss)
-
 
 
 fig = plt.figure()
@@ -124,34 +114,27 @@ zs = []
 sampling_frequency = 2000
 filterOrderIMU = 3
 lowCutoff = 1
-avg_mean_training = []
-avg_std_training = []
+avg_mean_training = [1100.075402]
+avg_std_training = [23852.0515]
 global zi
 
 b, zi = create_butterworth_filter()
 dev = create_connection_accel('localhost')
 
-# non Filtered plot
-# ax = fig.add_subplot(3, 1, 1)
-# ay = fig.add_subplot(3, 1, 2)
-# az = fig.add_subplot(3, 1, 3)
-# acquire_data_thread = threading.Thread(target=check_accel_thread, args=('localhost', ))
+ax = fig.add_subplot(3, 1, 1)
+ay = fig.add_subplot(3, 1, 2)
+az = fig.add_subplot(3, 1, 3)
 
-# Filtered plot
-ax = fig.add_subplot(2, 1, 1)
-ay = fig.add_subplot(2, 1, 2)
 try:
+    # acquire_data_thread = threading.Thread(target=check_accel_thread, args=('localhost', ))
     acquire_data_thread = threading.Thread(target=check_accel_thread_filtered, args=('localhost', ))
 
     acquire_data_thread.daemon = True
     acquire_data_thread.start()
 
-    # # Non Filtered
-    # ani = animation.FuncAnimation(fig, animate, fargs=(), interval=10)
-    # Filtered
-    ani = animation.FuncAnimation(fig, animate_filtered, fargs=(), interval=8)
+    ani = animation.FuncAnimation(fig, animate, fargs=(), interval=10)
     plt.show()
+
 except KeyboardInterrupt:
     dev.stop()
-
-
+    exit(0)
