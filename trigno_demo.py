@@ -17,13 +17,9 @@ def create_butterworth_filter():
 
 def smooth_data(data, zi):
     #  Lowpass filter
-    # smoothed_data, zi = lfilter(b[0], b[1], [data], zi=zi)
+    smoothed_data, z = lfilter(b[0], b[1], [data], zi=zi)
+    zi = z
 
-    # Bujtterworth Filter
-    smoothed_data = filtfilt(b[0], b[1], [data], method="gust")
-
-    zi = zi
-    # smoothed_data = filtfilt(b[0], b[1], data, method='gust', irlen=2)
     return smoothed_data[0]
 
 
@@ -81,8 +77,8 @@ def check_accel_thread_filtered(host):
     print("Connection established::")
     while True:
         data = dev.read()
-        xs.append(data[0][0])
-        ys.append(smooth_data(data[0][0], zi))
+        xs.append(data[4][0])
+        ys.append(smooth_data(data[4][0], zi))
         zs.append(data[2][0])
 
 
@@ -90,7 +86,7 @@ def animate(i):
     if ys:
         # data = dev.read()
         # ys.append(data[1][0])
-        print(ys[-1])
+        print(xs[-1], "\t", ys[-1])
         # ys = ys[-100:]
         # Draw x and y lists
         xss = xs[-200:]
@@ -104,34 +100,58 @@ def animate(i):
         az.plot(zss)
 
 
+def animate_filtered(i):
+    if ys:
+        # data = dev.read()
+        # ys.append(data[1][0])
+        print(xs[-1], "\t", ys[-1])
+        # ys = ys[-100:]
+        # Draw x and y lists
+        xss = xs[-200:]
+        yss = ys[-200:]
+        ax.clear()
+        ay.clear()
+        ax.plot(xss)
+        ay.plot(yss)
+
+
+
 fig = plt.figure()
-ax = fig.add_subplot(3, 1, 1)
-ay = fig.add_subplot(3, 1, 2)
-az = fig.add_subplot(3, 1, 3)
 xs = []
 ys = []
 zs = []
 
 sampling_frequency = 2000
-filterOrderEMG = 4
-filterOrderIMU = 1
+filterOrderIMU = 3
 lowCutoff = 1
 avg_mean_training = []
 avg_std_training = []
+global zi
 
 b, zi = create_butterworth_filter()
 dev = create_connection_accel('localhost')
 
-# Non filtered data
+# non Filtered plot
+# ax = fig.add_subplot(3, 1, 1)
+# ay = fig.add_subplot(3, 1, 2)
+# az = fig.add_subplot(3, 1, 3)
 # acquire_data_thread = threading.Thread(target=check_accel_thread, args=('localhost', ))
-# filtered data
-acquire_data_thread = threading.Thread(target=check_accel_thread_filtered, args=('localhost', ))
 
-acquire_data_thread.daemon = True
-acquire_data_thread.start()
+# Filtered plot
+ax = fig.add_subplot(2, 1, 1)
+ay = fig.add_subplot(2, 1, 2)
+try:
+    acquire_data_thread = threading.Thread(target=check_accel_thread_filtered, args=('localhost', ))
 
-ani = animation.FuncAnimation(fig, animate, fargs=(), interval=10)
-plt.show()
+    acquire_data_thread.daemon = True
+    acquire_data_thread.start()
 
+    # # Non Filtered
+    # ani = animation.FuncAnimation(fig, animate, fargs=(), interval=10)
+    # Filtered
+    ani = animation.FuncAnimation(fig, animate_filtered, fargs=(), interval=8)
+    plt.show()
+except KeyboardInterrupt:
+    dev.stop()
 
 
