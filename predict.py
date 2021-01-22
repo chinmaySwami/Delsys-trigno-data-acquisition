@@ -16,12 +16,17 @@ def create_connection_accl(host):
     return dev
 
 
-def smoothData(sampleRate, lowpass, ord, rData):
-    nyq = 0.5 * sampleRate
-    low = lowpass / nyq
-    b = butter(ord, low, btype='low', output='ba')
-    smoothedData = filtfilt(b[0], b[1], rData, method="gust")
-    return smoothedData
+def smooth_data(data):
+    nyq = 0.5 * sampling_frequency
+    low = lowCutoff / nyq
+    b = butter(filterOrderIMU, low, btype='low', output='ba')
+    smoothed_data = filtfilt(b[0], b[1], data, method="gust")
+    return smoothed_data
+
+
+def normalize_data(data):
+    n_data = (data - avg_mean_training)/avg_std_training
+    return n_data
 
 
 def acquire_imu_predict():
@@ -30,18 +35,22 @@ def acquire_imu_predict():
     try:
         while True:
             data = dev.read()
-            imu_data.append(np.concatenate((data[9:15], data[27:33], data[36:42],
-                            data[45:51], data[54:60]), axis=0))
-            pred_theta_dot = rud_model.predict([imu_data[-1].flatten()])
+            raw_imu_data = np.concatenate((data[9:15], data[27:33], data[36:42], data[45:51], data[54:60]), axis=0)
+            filtered_imu_data = smooth_data(raw_imu_data)
+            normalized_imu_data = normalize_data(filtered_imu_data)
+            pred_theta_dot = rud_model.predict([normalized_imu_data[-1].flatten()])
             print("predicted angular velocity:\t", pred_theta_dot[0])
     except KeyboardInterrupt:
         dev.stop()
         print('Data acquisition stopped')
 
 
+sampling_frequency = 2000
 filterOrderEMG = 4
 filterOrderIMU = 1
 lowCutoff = 1
+avg_mean_training = []
+avg_std_training = []
 
 print("Loading regression model::")
 # For PS
