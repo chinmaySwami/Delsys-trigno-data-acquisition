@@ -3,10 +3,16 @@ from time import sleep
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-from matplotlib import style
-import logging
 import threading
-import time
+from scipy.signal import butter, filtfilt
+
+
+def smooth_data(data):
+    nyq = 0.5 * sampling_frequency
+    low = lowCutoff / nyq
+    b = butter(filterOrderIMU, low, btype='low', output='ba')
+    smoothed_data = filtfilt(b[0], b[1], data, method="gust")
+    return smoothed_data
 
 
 def check_accel(host):
@@ -28,7 +34,7 @@ def check_accel(host):
     dev.stop()
 
 
-def create_connection_accl(host):
+def create_connection_accel(host):
     dev = pytrigno.TrignoAccel(channel_range=(0, 35), samples_per_read=1,
                                host=host)
     dev.check_sensor_n_type(1)
@@ -53,16 +59,22 @@ def check_accel_thread(host):
         zs.append(data[2][0])
 
 
-def save_to_csv():
-    ys_np = []
-    for lst in ys:
-        ys_np.append(lst.flatten())
-    ys_np = np.array(ys_np)
-    np.savetxt("Tests/test.csv", ys_np, delimiter=",")
-    print("Saved to csv successfully: ")
+def check_accel_thread_filtered(host):
+    dev.check_sensor_n_type(1)
+    dev.check_sensor_n_mode(1)
+    dev.check_sensor_n_start_index(1)
+    dev.check_sensor_n_auxchannel_count(1)
+
+    dev.start()
+    print("Connection established::")
+    while True:
+        data = dev.read()
+        xs.append(data[0][0])
+        ys.append(smooth_data(data[0][0]))
+        zs.append(data[2][0])
 
 
-def animate(i, xs, ys):
+def animate(i):
     if ys:
         # data = dev.read()
         # ys.append(data[1][0])
@@ -88,8 +100,20 @@ xs = []
 ys = []
 zs = []
 
-dev = create_connection_accl('localhost')
-acquire_data_thread = threading.Thread(target=check_accel_thread, args=('localhost', ))
+sampling_frequency = 2000
+filterOrderEMG = 4
+filterOrderIMU = 1
+lowCutoff = 1
+avg_mean_training = []
+avg_std_training = []
+
+dev = create_connection_accel('localhost')
+
+# Non filtered data
+# acquire_data_thread = threading.Thread(target=check_accel_thread, args=('localhost', ))
+# filtered data
+acquire_data_thread = threading.Thread(target=check_accel_thread_filtered, args=('localhost', ))
+
 acquire_data_thread.daemon = True
 acquire_data_thread.start()
 
