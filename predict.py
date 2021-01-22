@@ -3,6 +3,7 @@ import pandas
 import numpy as np
 import pickle
 import pytrigno
+from scipy.signal import butter, lfilter, freqz,filtfilt
 
 
 def create_connection_accl(host):
@@ -13,6 +14,14 @@ def create_connection_accl(host):
     dev.check_sensor_n_start_index(1)
     dev.check_sensor_n_auxchannel_count(1)
     return dev
+
+
+def smoothData(sampleRate, lowpass, ord, rData):
+    nyq = 0.5 * sampleRate
+    low = lowpass / nyq
+    b = butter(ord, low, btype='low', output='ba')
+    smoothedData = filtfilt(b[0], b[1], rData, method="gust")
+    return smoothedData
 
 
 def acquire_imu_predict():
@@ -29,6 +38,10 @@ def acquire_imu_predict():
         dev.stop()
         print('Data acquisition stopped')
 
+
+filterOrderEMG = 4
+filterOrderIMU = 1
+lowCutoff = 1
 
 print("Loading regression model::")
 # For PS
