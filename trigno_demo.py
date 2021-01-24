@@ -37,6 +37,9 @@ def check_accel(host):
     dev.check_sensor_n_mode(1)
     dev.check_sensor_n_start_index(1)
     dev.check_sensor_n_auxchannel_count(1)
+    dev.check_sensor_channel_unit(2, 1)
+    dev.check_sensor_channel_unit(2, 4)
+    dev.check_sensor_channel_unit(2, 7)
 
     dev.start()
     print("Connection established::")
@@ -69,10 +72,13 @@ def create_connection_accel(host):
 
 
 def check_accel_thread(host):
-    dev.check_sensor_n_type(1)
-    dev.check_sensor_n_mode(1)
-    dev.check_sensor_n_start_index(1)
-    dev.check_sensor_n_auxchannel_count(1)
+    dev.check_sensor_n_type(2)
+    dev.check_sensor_n_mode(2)
+    dev.check_sensor_n_start_index(2)
+    dev.check_sensor_n_auxchannel_count(2)
+    for i in range(7):
+        dev.check_sensor_channel_unit(2, i)
+
 
     dev.start()
     print("Connection established::")
@@ -84,21 +90,15 @@ def check_accel_thread(host):
 
 
 def check_accel_thread_filtered(host):
-    dev.check_sensor_n_type(1)
-    dev.check_sensor_n_mode(1)
-    dev.check_sensor_n_start_index(1)
-    dev.check_sensor_n_auxchannel_count(1)
-
     dev.start()
     print("Connection established::")
     while True:
-        data = dev.read()
-        filtered = smooth_data(data[12][0], zi)
-        norm = normalize_data(data[12][0])
-        scaled = scale_data(data[12][0])
-        xs.append(data[12][0])
-        ys.append(norm)
-        zs.append(scaled)
+        data = dev.read() * 9806.65
+        filtered = smooth_data(data[9][0], zi)
+        norm = normalize_data(data[9][0])
+        xs.append(data[9][0])
+        ys.append(filtered)
+        zs.append(norm)
 
 
 def animate(i):
@@ -127,8 +127,8 @@ zs = []
 sampling_frequency = 2000
 filterOrderIMU = 1
 lowCutoff = 1
-avg_mean_training = -0.56184
-avg_std_training = 46.0059
+avg_mean_training = -12944.23568
+avg_std_training = 1249.343902
 max = 3.55477
 min = -2.8562
 
