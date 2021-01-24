@@ -64,10 +64,13 @@ def scale_data(data):
 
 def create_connection_accel(host):
     dev = pytrigno.TrignoAccel(channel_range=(0, 35), samples_per_read=1, host=host)
-    dev.check_sensor_n_type(1)
-    dev.check_sensor_n_mode(1)
-    dev.check_sensor_n_start_index(1)
-    dev.check_sensor_n_auxchannel_count(1)
+    dev.check_sensor_n_type(sensor_number)
+    dev.check_sensor_n_mode(sensor_number)
+    dev.check_sensor_n_start_index(sensor_number)
+    dev.check_sensor_n_auxchannel_count(sensor_number)
+    dev.check_sensor_channel_unit(sensor_number, 1)
+    dev.check_sensor_channel_unit(sensor_number, 4)
+    dev.check_sensor_channel_unit(sensor_number, 7)
     return dev
 
 
@@ -123,12 +126,12 @@ fig = plt.figure()
 xs = []
 ys = []
 zs = []
-
+sensor_number = 2
 sampling_frequency = 2000
 filterOrderIMU = 1
 lowCutoff = 1
-avg_mean_training = -12944.23568
-avg_std_training = 1249.343902
+avg_mean_training = -9118.053149
+avg_std_training = 2411.182781
 max = 3.55477
 min = -2.8562
 
@@ -151,7 +154,7 @@ try:
     acquire_data_thread.daemon = True
     acquire_data_thread.start()
 
-    ani = animation.FuncAnimation(fig, animate, fargs=(), interval=10)
+    ani = animation.FuncAnimation(fig, animate, fargs=(), interval=8)
     plt.show()
 
 except KeyboardInterrupt:
