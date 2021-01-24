@@ -3,7 +3,8 @@ import pandas
 import numpy as np
 import pickle
 import pytrigno
-from scipy.signal import butter, lfilter, freqz,filtfilt
+from scipy.signal import butter, filtfilt
+from sklearn.preprocessing import StandardScaler
 
 
 def create_connection_accl(host):
@@ -14,6 +15,14 @@ def create_connection_accl(host):
     dev.check_sensor_n_start_index(1)
     dev.check_sensor_n_auxchannel_count(1)
     return dev
+
+
+def create_standard_scalar():
+    scalar = StandardScaler()
+    scalar.mean_ = np.array([804.68])
+    scalar.var_ = np.array([67047282117])
+    scalar.scale_ = np.array(np.sqrt(scalar.var_))
+    return scalar
 
 
 def smooth_data(data):
@@ -34,7 +43,7 @@ def acquire_imu_predict():
     print("Connection established::")
     try:
         while True:
-            data = dev.read()
+            data = dev.read() * 9806.65
             raw_imu_data = np.concatenate((data[9:15], data[27:33], data[36:42], data[45:51], data[54:60]), axis=0)
             # filtered_imu_data = smooth_data(raw_imu_data)
             normalized_imu_data = normalize_data(raw_imu_data.flatten())
@@ -49,16 +58,16 @@ sampling_frequency = 2000
 filterOrderEMG = 4
 filterOrderIMU = 1
 lowCutoff = 1
-avg_mean_training = [-7557.074342, 238.9051397, -7004.522484, 1100.075402, 8357.125645, -3072.610687, -9787.098475,
-                     716.5740751, -2461.864722, 1468.178587, -412.4093905, -1145.956741, -3408.054336, 992.7556896,
-                     624.4395445, 23619.40505, 8885.855499, 1394.194849, -4494.225019, -454.6410738, -1114.837898,
-                     3616.154164, 7812.728116, 879.4170656, 4581.595772, -1112.281237, -1521.265704, 498.9367503,
-                     8031.761407, 3475.425272]
-avg_std_training = [3899.100149, 514.3201803, 4127.585205, 23852.0515, 74641.24657, 30605.56797, 3006.187073,
-                    644.0836957, 4982.276768, 19552.98379, 79514.72385, 32777.61901, 1990.689673, 830.3656838,
-                    2630.36271, 35482.23785, 79879.04171, 16961.90462, 1422.30238, 412.355329, 3258.372477,
-                    16624.68747, 35696.7495, 19250.84621, 1370.720671, 374.9487406, 3091.811698, 18509.75631,
-                    19317.85871, 21869.72258]
+avg_mean_training = np.array([-7557.074342, 238.9051397, -7004.522484, 1100.075402, 8357.125645, -3072.610687,
+                              -9787.098475, 716.5740751, -2461.864722, 1468.178587, -412.4093905, -1145.956741,
+                              -3408.054336, 992.7556896, 624.4395445, 23619.40505, 8885.855499, 1394.194849,
+                              -4494.225019, -454.6410738, -1114.837898, 3616.154164, 7812.728116, 879.4170656,
+                              4581.595772, -1112.281237, -1521.265704, 498.9367503, 8031.761407, 3475.425272])
+avg_std_training = np.array([3899.100149, 514.3201803, 4127.585205, 23852.0515, 74641.24657, 30605.56797, 3006.187073,
+                            644.0836957, 4982.276768, 19552.98379, 79514.72385, 32777.61901, 1990.689673, 830.3656838,
+                            2630.36271, 35482.23785, 79879.04171, 16961.90462, 1422.30238, 412.355329, 3258.372477,
+                            16624.68747, 35696.7495, 19250.84621, 1370.720671, 374.9487406, 3091.811698, 18509.75631,
+                            19317.85871, 21869.72258])
 
 print("Loading regression model::")
 # For PS
