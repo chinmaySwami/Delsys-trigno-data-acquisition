@@ -110,6 +110,13 @@ class _BaseTrignoDaq(object):
         cmd = 'SENSOR ' + str(n) + ' AUXCHANNELCOUNT?'
         self._send_cmd(cmd)
 
+    def check_sensor_channel_unit(self, n, m):
+        """
+        Check the unit of the channels
+        """
+        cmd = 'SENSOR ' + str(n) + ' CHANNEL '+str(m)+' UNITS?'
+        self._send_cmd(cmd)
+
     def read(self, num_samples):
         """
         Request a sample of data from the device.
