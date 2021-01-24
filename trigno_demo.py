@@ -97,11 +97,11 @@ def check_accel_thread_filtered(host):
     print("Connection established::")
     while True:
         data = dev.read() * 9806.65
-        filtered = smooth_data(data[9][0], zi)
-        norm = normalize_data(data[9][0])
-        xs.append(data[9][0])
-        ys.append(filtered)
-        zs.append(norm)
+        # filtered = smooth_data(data[9][0], zi)
+        # norm = normalize_data(data[9][0])
+        xs.append(data[0][0])
+        ys.append(data[12][0])
+        zs.append(data[28][0])
 
 
 def animate(i):
