@@ -5,6 +5,15 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import threading
 from scipy.signal import butter, filtfilt, lfilter_zi, lfilter
+from sklearn.preprocessing import StandardScaler
+
+
+def create_standard_scalar():
+    scalar = StandardScaler()
+    scalar.mean_ = np.array([804.68])
+    scalar.var_ = np.array([32228.98001])
+    scalar.scale_ = np.array(np.sqrt(scalar.var_))
+    return scalar
 
 
 def create_butterworth_filter():
@@ -42,7 +51,7 @@ def check_accel(host):
 
 
 def normalize_data(data):
-    n_data = (np.array([data]) - avg_mean_training)/avg_std_training
+    n_data = (data - avg_mean_training)/avg_std_training
     return n_data
 
 
@@ -71,7 +80,7 @@ def check_accel_thread(host):
         zs.append(data[2][0])
 
 
-def check_accel_thread_filtered(host):
+def check_accel_thread_filtered(host, scalar):
     dev.check_sensor_n_type(1)
     dev.check_sensor_n_mode(1)
     dev.check_sensor_n_start_index(1)
@@ -82,10 +91,11 @@ def check_accel_thread_filtered(host):
     while True:
         data = dev.read()
         filtered = smooth_data(data[12][0], zi)
-        norm = normalize_data(filtered)
+        # norm = normalize_data(data[12][0])
+        norm = scalar.transform(np.array([data[12]]))
         xs.append(data[12][0])
         ys.append(filtered)
-        zs.append(norm[0])
+        zs.append(norm)
 
 
 def animate(i):
@@ -112,14 +122,14 @@ ys = []
 zs = []
 
 sampling_frequency = 2000
-filterOrderIMU = 3
+filterOrderIMU = 1
 lowCutoff = 1
-avg_mean_training = [1100.075402]
-avg_std_training = [23852.0515]
-global zi
+avg_mean_training = 1200.68
+avg_std_training = 1000.0515
 
 b, zi = create_butterworth_filter()
 dev = create_connection_accel('localhost')
+scalar = create_standard_scalar()
 
 ax = fig.add_subplot(3, 1, 1)
 ay = fig.add_subplot(3, 1, 2)
@@ -127,7 +137,7 @@ az = fig.add_subplot(3, 1, 3)
 
 try:
     # acquire_data_thread = threading.Thread(target=check_accel_thread, args=('localhost', ))
-    acquire_data_thread = threading.Thread(target=check_accel_thread_filtered, args=('localhost', ))
+    acquire_data_thread = threading.Thread(target=check_accel_thread_filtered, args=('localhost', scalar, ))
 
     acquire_data_thread.daemon = True
     acquire_data_thread.start()
