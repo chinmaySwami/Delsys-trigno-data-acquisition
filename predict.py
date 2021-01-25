@@ -52,7 +52,7 @@ def acquire_imu():
             data_s = data * 9806.65
             imu_data.append(np.concatenate((data_s[9:15], data_s[27:33], data_s[36:42], data_s[45:51],
                                             data_s[54:60]), axis=0))
-            print(data[12][0])
+            # print(data[12][0])
     except KeyboardInterrupt:
         dev.stop()
         print('Data acquisition stopped')
@@ -88,7 +88,9 @@ acquire_data_thread.start()
 
 while True:
     try:
-        predicted_theta_dot = rud_model.predict(imu_data[-1])
+        if imu_data:
+            predicted_theta_dot = rud_model.predict([imu_data[-1].flatten()])
+            print(imu_data[-1].flatten()[3], predicted_theta_dot)
     except KeyboardInterrupt:
         dev.stop()
         exit(0)
