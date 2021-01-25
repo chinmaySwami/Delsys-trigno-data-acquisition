@@ -6,7 +6,7 @@ import pytrigno
 from scipy.signal import butter, filtfilt
 from sklearn.preprocessing import StandardScaler
 import time
-from hummingbird.ml import convert
+import threading
 
 
 def create_connection_accl(host):
@@ -43,25 +43,16 @@ def normalize_data(data):
     return n_data
 
 
-def acquire_imu_predict():
+def acquire_imu():
     dev.start()
     print("Connection established::")
     try:
         while True:
             data = dev.read()
             data_s = data * 9806.65
-            raw_imu_data = np.concatenate((data_s[9:15], data_s[27:33], data_s[36:42], data_s[45:51], data_s[54:60]), axis=0)
-            # filtered_imu_data = smooth_data(raw_imu_data)
-            # if data[12][0] != 0.0:
-            #     print("yep")
-            normalized_imu_data = normalize_data(raw_imu_data.flatten())
-            start = time.time()
-            pred_theta_dot = rud_model.predict([normalized_imu_data])
-
-            # print("predicted angular velocity:\t", pred_theta_dot[0], "\t", raw_imu_data[3][0], "\t",
-            #       normalized_imu_data[3], "\t", data[12][0])
-            print("stop time: ", time.time() - start, "\t", data[12][0], "\t", normalized_imu_data[3], "\t",
-                  raw_imu_data[3][0])
+            imu_data.append(np.concatenate((data_s[9:15], data_s[27:33], data_s[36:42], data_s[45:51],
+                                            data_s[54:60]), axis=0))
+            print(data[12][0])
     except KeyboardInterrupt:
         dev.stop()
         print('Data acquisition stopped')
@@ -89,12 +80,18 @@ print("Loading regression model::")
 # For RUD
 rud_model = pickle.load(open("D:/Chinmay/ML Pipeline/Trained model/mode_1_20201006-083222", "rb"))
 rud_model.verbose = False
-
 print(rud_model.n_estimators, rud_model.max_depth, rud_model.max_features)
-print("Model loaded successfully:: Now converting to hummingbird model")
-rud_model = convert(rud_model, 'pytorch')
-print("Converted sklearn model to : ", type(rud_model))
+print("Model loaded successfully::")
+acquire_data_thread = threading.Thread(target=acquire_imu)
+acquire_data_thread.daemon = True
+acquire_data_thread.start()
 
-acquire_imu_predict()
+while True:
+    try:
+        predicted_theta_dot = rud_model.predict(imu_data[-1])
+    except KeyboardInterrupt:
+        dev.stop()
+        exit(0)
+# acquire_imu_predict()
 # save_to_csv()
 print("Finished")
