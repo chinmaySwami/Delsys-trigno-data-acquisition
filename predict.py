@@ -10,10 +10,13 @@ from sklearn.preprocessing import StandardScaler
 def create_connection_accl(host):
     dev = pytrigno.TrignoAccel(channel_range=(0, 63), samples_per_read=1,
                                host=host)
-    dev.check_sensor_n_type(1)
-    dev.check_sensor_n_mode(1)
-    dev.check_sensor_n_start_index(1)
-    dev.check_sensor_n_auxchannel_count(1)
+    dev.check_sensor_n_type(sensor_number)
+    dev.check_sensor_n_mode(sensor_number)
+    dev.check_sensor_n_start_index(sensor_number)
+    dev.check_sensor_n_auxchannel_count(sensor_number)
+    dev.check_sensor_channel_unit(sensor_number, 1)
+    dev.check_sensor_channel_unit(sensor_number, 4)
+    dev.check_sensor_channel_unit(sensor_number, 7)
     return dev
 
 
@@ -34,7 +37,7 @@ def smooth_data(data):
 
 
 def normalize_data(data):
-    n_data = (data - avg_mean_training)/avg_std_training
+    n_data = np.multiply(data, avg_mean_training)/avg_std_training
     return n_data
 
 
@@ -46,9 +49,11 @@ def acquire_imu_predict():
             data = dev.read() * 9806.65
             raw_imu_data = np.concatenate((data[9:15], data[27:33], data[36:42], data[45:51], data[54:60]), axis=0)
             # filtered_imu_data = smooth_data(raw_imu_data)
+            # if data[12][0] != 0.0:
+            #     print("yep")
             normalized_imu_data = normalize_data(raw_imu_data.flatten())
             pred_theta_dot = rud_model.predict([normalized_imu_data])
-            print("predicted angular velocity:\t", pred_theta_dot[0], "\t", data[12][0], "\t", normalized_imu_data[12])
+            print("predicted angular velocity:\t", pred_theta_dot[0], "\t", raw_imu_data[3][0], "\t", normalized_imu_data[3])
     except KeyboardInterrupt:
         dev.stop()
         print('Data acquisition stopped')
@@ -69,6 +74,10 @@ avg_std_training = np.array([3899.100149, 514.3201803, 4127.585205, 23852.0515, 
                             16624.68747, 35696.7495, 19250.84621, 1370.720671, 374.9487406, 3091.811698, 18509.75631,
                             19317.85871, 21869.72258])
 
+
+imu_data = []
+sensor_number = 2
+dev = create_connection_accl('localhost')
 print("Loading regression model::")
 # For PS
 # rud_model = pickle.load(open("D:/Chinmay/ML Pipeline/Trained model/mode_0_20201006-104041", "rb"))
@@ -77,8 +86,6 @@ rud_model = pickle.load(open("D:/Chinmay/ML Pipeline/Trained model/mode_1_202010
 rud_model.verbose = False
 print(rud_model.n_estimators, rud_model.max_depth, rud_model.max_features)
 print("Model loaded successfully::")
-imu_data = []
-dev = create_connection_accl('localhost')
 acquire_imu_predict()
 # save_to_csv()
 print("Finished")
