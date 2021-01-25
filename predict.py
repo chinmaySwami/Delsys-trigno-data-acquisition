@@ -37,7 +37,7 @@ def smooth_data(data):
 
 
 def normalize_data(data):
-    n_data = np.multiply(data, avg_mean_training)/avg_std_training
+    n_data = np.divide((data - avg_mean_training), avg_std_training)
     return n_data
 
 
@@ -46,21 +46,23 @@ def acquire_imu_predict():
     print("Connection established::")
     try:
         while True:
-            data = dev.read() * 9806.65
-            raw_imu_data = np.concatenate((data[9:15], data[27:33], data[36:42], data[45:51], data[54:60]), axis=0)
+            data = dev.read()
+            data_s = data * 9806.65
+            raw_imu_data = np.concatenate((data_s[9:15], data_s[27:33], data_s[36:42], data_s[45:51], data_s[54:60]), axis=0)
             # filtered_imu_data = smooth_data(raw_imu_data)
             # if data[12][0] != 0.0:
             #     print("yep")
             normalized_imu_data = normalize_data(raw_imu_data.flatten())
             pred_theta_dot = rud_model.predict([normalized_imu_data])
-            print("predicted angular velocity:\t", pred_theta_dot[0], "\t", raw_imu_data[3][0], "\t", normalized_imu_data[3])
+            # print("predicted angular velocity:\t", pred_theta_dot[0], "\t", raw_imu_data[3][0], "\t",
+            #       normalized_imu_data[3], "\t", data[12][0])
+            print("predicted angular velocity:\t", data[12][0], "\t", normalized_imu_data[3], "\t", raw_imu_data[3][0])
     except KeyboardInterrupt:
         dev.stop()
         print('Data acquisition stopped')
 
 
 sampling_frequency = 2000
-filterOrderEMG = 4
 filterOrderIMU = 1
 lowCutoff = 1
 avg_mean_training = np.array([-7557.074342, 238.9051397, -7004.522484, 1100.075402, 8357.125645, -3072.610687,
@@ -73,8 +75,6 @@ avg_std_training = np.array([3899.100149, 514.3201803, 4127.585205, 23852.0515, 
                             2630.36271, 35482.23785, 79879.04171, 16961.90462, 1422.30238, 412.355329, 3258.372477,
                             16624.68747, 35696.7495, 19250.84621, 1370.720671, 374.9487406, 3091.811698, 18509.75631,
                             19317.85871, 21869.72258])
-
-
 imu_data = []
 sensor_number = 2
 dev = create_connection_accl('localhost')
