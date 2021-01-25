@@ -82,7 +82,6 @@ def check_accel_thread(host):
     for i in range(7):
         dev.check_sensor_channel_unit(2, i)
 
-
     dev.start()
     print("Connection established::")
     while True:
@@ -102,6 +101,7 @@ def check_accel_thread_filtered(host):
         xs.append(data[0][0])
         ys.append(data[12][0])
         zs.append(data[28][0])
+        sleep(0.2)
 
 
 def animate(i):
