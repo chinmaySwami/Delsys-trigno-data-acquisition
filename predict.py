@@ -5,6 +5,8 @@ import pickle
 import pytrigno
 from scipy.signal import butter, filtfilt
 from sklearn.preprocessing import StandardScaler
+import time
+from hummingbird.ml import convert
 
 
 def create_connection_accl(host):
@@ -53,10 +55,13 @@ def acquire_imu_predict():
             # if data[12][0] != 0.0:
             #     print("yep")
             normalized_imu_data = normalize_data(raw_imu_data.flatten())
+            start = time.time()
             pred_theta_dot = rud_model.predict([normalized_imu_data])
+
             # print("predicted angular velocity:\t", pred_theta_dot[0], "\t", raw_imu_data[3][0], "\t",
             #       normalized_imu_data[3], "\t", data[12][0])
-            print("predicted angular velocity:\t", data[12][0], "\t", normalized_imu_data[3], "\t", raw_imu_data[3][0])
+            print("stop time: ", time.time() - start, "\t", data[12][0], "\t", normalized_imu_data[3], "\t",
+                  raw_imu_data[3][0])
     except KeyboardInterrupt:
         dev.stop()
         print('Data acquisition stopped')
@@ -84,8 +89,12 @@ print("Loading regression model::")
 # For RUD
 rud_model = pickle.load(open("D:/Chinmay/ML Pipeline/Trained model/mode_1_20201006-083222", "rb"))
 rud_model.verbose = False
+
 print(rud_model.n_estimators, rud_model.max_depth, rud_model.max_features)
-print("Model loaded successfully::")
+print("Model loaded successfully:: Now converting to hummingbird model")
+rud_model = convert(rud_model, 'pytorch')
+print("Converted sklearn model to : ", type(rud_model))
+
 acquire_imu_predict()
 # save_to_csv()
 print("Finished")
