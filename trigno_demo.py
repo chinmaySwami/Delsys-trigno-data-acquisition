@@ -93,10 +93,10 @@ def check_accel_thread_filtered(host, zi):
         data = dev.read().flatten()
         data = np.multiply(data, scaling_array)
         filtered, zi = lfilter(b[0], b[1], [data[12]], zi=zi)
-        norm = normalize_data(data[12])
+        norm = normalize_data(filtered[0])
         xs.append(data[12])
-        ys.append(norm)
-        zs.append(filtered)
+        ys.append(filtered[0])
+        zs.append(norm)
 
 
 def animate(i):
@@ -127,7 +127,7 @@ scaling_array = np.array([9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 100
                           9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000])
 sensor_number = 2
 sampling_frequency = 148
-filterOrderIMU = 1
+filterOrderIMU = 3
 lowCutoff = 1
 avg_mean_training = 1100.075402
 avg_std_training = 23852.0515
