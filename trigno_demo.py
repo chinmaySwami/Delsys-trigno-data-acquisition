@@ -95,14 +95,13 @@ def check_accel_thread_filtered(host):
     dev.start()
     print("Connection established::")
     while True:
-        data = dev.read()
+        data = dev.read().flatten()
         data = np.multiply(data, scaling_array)
         # filtered = smooth_data(data[9][0], zi)
-        # norm = normalize_data(data[9][0])
-        xs.append(data[0][0])
-        ys.append(data[12][0])
-        zs.append(data[28][0])
-        sleep(0.2)
+        norm = normalize_data(data[12])
+        xs.append(data[12])
+        ys.append(norm)
+        zs.append(data[12])
 
 
 def animate(i):
@@ -127,15 +126,16 @@ fig = plt.figure()
 xs = []
 ys = []
 zs = []
-scaling_array = [9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 9806.65, 9806.65, 9806.65, 1000, 1000, 1000,
-                 9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 9806.65, 9806.65, 9806.65, 1000, 1000, 1000,
-                 9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 9806.65, 9806.65, 9806.65, 1000, 1000, 1000]
+scaling_array = np.array([9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000,
+                          9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000,
+                          9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000,
+                          9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000])
 sensor_number = 2
 sampling_frequency = 2000
 filterOrderIMU = 1
 lowCutoff = 1
-avg_mean_training = -9118.053149
-avg_std_training = 2411.182781
+avg_mean_training = 1100.075402
+avg_std_training = 23852.0515
 max = 3.55477
 min = -2.8562
 
