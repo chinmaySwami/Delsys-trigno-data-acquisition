@@ -95,7 +95,8 @@ def check_accel_thread_filtered(host):
     dev.start()
     print("Connection established::")
     while True:
-        data = dev.read() * 9806.65
+        data = dev.read()
+        data = np.multiply(data, scaling_array)
         # filtered = smooth_data(data[9][0], zi)
         # norm = normalize_data(data[9][0])
         xs.append(data[0][0])
@@ -126,6 +127,9 @@ fig = plt.figure()
 xs = []
 ys = []
 zs = []
+scaling_array = [9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 9806.65, 9806.65, 9806.65, 1000, 1000, 1000,
+                 9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 9806.65, 9806.65, 9806.65, 1000, 1000, 1000,
+                 9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 9806.65, 9806.65, 9806.65, 1000, 1000, 1000]
 sensor_number = 2
 sampling_frequency = 2000
 filterOrderIMU = 1
