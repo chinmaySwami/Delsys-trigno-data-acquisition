@@ -10,7 +10,7 @@ import threading
 
 
 def create_connection_accl(host):
-    dev = pytrigno.TrignoAccel(channel_range=(0, 63), samples_per_read=1,
+    dev = pytrigno.TrignoAccel(channel_range=(0, 62), samples_per_read=1,
                                host=host)
     dev.check_sensor_n_type(sensor_number)
     dev.check_sensor_n_mode(sensor_number)
@@ -48,11 +48,10 @@ def acquire_imu():
     print("Connection established::")
     try:
         while True:
-            data = dev.read()
-            data_s = data * 9806.65
+            data = dev.read().flatten()
+            data_s = np.multiply(data, scaling_array)
             imu_data.append(np.concatenate((data_s[9:15], data_s[27:33], data_s[36:42], data_s[45:51],
                                             data_s[54:60]), axis=0))
-            # print(data[12][0])
     except KeyboardInterrupt:
         dev.stop()
         print('Data acquisition stopped')
@@ -71,6 +70,13 @@ avg_std_training = np.array([3899.100149, 514.3201803, 4127.585205, 23852.0515, 
                             2630.36271, 35482.23785, 79879.04171, 16961.90462, 1422.30238, 412.355329, 3258.372477,
                             16624.68747, 35696.7495, 19250.84621, 1370.720671, 374.9487406, 3091.811698, 18509.75631,
                             19317.85871, 21869.72258])
+scaling_array = np.array([9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000,
+                          9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000,
+                          9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000,
+                          9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000,
+                          9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000,
+                          9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000,
+                          9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000])
 imu_data = []
 sensor_number = 2
 dev = create_connection_accl('localhost')
@@ -80,6 +86,7 @@ print("Loading regression model::")
 # For RUD
 rud_model = pickle.load(open("D:/Chinmay/ML Pipeline/Trained model/mode_1_20201006-083222", "rb"))
 rud_model.verbose = False
+rud_model.n_jobs=8
 print(rud_model.n_estimators, rud_model.max_depth, rud_model.max_features)
 print("Model loaded successfully::")
 acquire_data_thread = threading.Thread(target=acquire_imu)
@@ -89,8 +96,11 @@ acquire_data_thread.start()
 while True:
     try:
         if imu_data:
-            predicted_theta_dot = rud_model.predict([imu_data[-1].flatten()])
-            print(imu_data[-1].flatten()[3], predicted_theta_dot)
+            normalized_data = normalize_data(imu_data[-1])
+            start = time.time()
+            predicted_theta_dot = rud_model.predict([normalized_data])
+            print("time to predict:\t", time.time()-start, "\t", imu_data[-1][3], "\t", normalized_data[3], "\t",
+                  predicted_theta_dot[0])
     except KeyboardInterrupt:
         dev.stop()
         exit(0)
