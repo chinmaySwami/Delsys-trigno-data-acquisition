@@ -3,7 +3,8 @@ import pickle
 import torch
 
 
-rud_model = pickle.load(open("D:/Chinmay/ML Pipeline/Trained model/mode_1_20201006-083222", "rb"))
+print("loading the sklearn model: ")
+rud_model = pickle.load(open("D:/Chinmay/ML Pipeline/Trained model/mode_1_20201006-083222 - Copy", "rb"))
 rud_model.verbose = False
 print(rud_model.n_estimators, rud_model.max_depth, rud_model.max_features)
 print("Model loaded successfully:: Now converting to hummingbird model")
