@@ -57,11 +57,6 @@ def normalize_data(data):
     return n_data
 
 
-def scale_data(data):
-    n_data = (data - min) / (max - min)
-    return n_data
-
-
 def create_connection_accel(host):
     dev = pytrigno.TrignoAccel(channel_range=(0, 35), samples_per_read=1, host=host)
     dev.check_sensor_n_type(sensor_number)
@@ -91,17 +86,17 @@ def check_accel_thread(host):
         zs.append(data[2][0])
 
 
-def check_accel_thread_filtered(host):
+def check_accel_thread_filtered(host, zi):
     dev.start()
     print("Connection established::")
     while True:
         data = dev.read().flatten()
         data = np.multiply(data, scaling_array)
-        # filtered = smooth_data(data[9][0], zi)
+        filtered, zi = lfilter(b[0], b[1], [data[12]], zi=zi)
         norm = normalize_data(data[12])
         xs.append(data[12])
         ys.append(norm)
-        zs.append(data[12])
+        zs.append(filtered)
 
 
 def animate(i):
@@ -131,13 +126,11 @@ scaling_array = np.array([9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 100
                           9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000,
                           9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000])
 sensor_number = 2
-sampling_frequency = 2000
+sampling_frequency = 148
 filterOrderIMU = 1
 lowCutoff = 1
 avg_mean_training = 1100.075402
 avg_std_training = 23852.0515
-max = 3.55477
-min = -2.8562
 
 b, zi = create_butterworth_filter()
 dev = create_connection_accel('localhost')
@@ -153,7 +146,7 @@ az = fig.add_subplot(3, 1, 3)
 
 try:
     # acquire_data_thread = threading.Thread(target=check_accel_thread, args=('localhost', ))
-    acquire_data_thread = threading.Thread(target=check_accel_thread_filtered, args=('localhost', ))
+    acquire_data_thread = threading.Thread(target=check_accel_thread_filtered, args=('localhost', zi, ))
 
     acquire_data_thread.daemon = True
     acquire_data_thread.start()
