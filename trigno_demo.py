@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import threading
-from scipy.signal import butter, filtfilt, lfilter_zi, lfilter
+from scipy.signal import butter, lfilter_zi, lfilter
 from sklearn.preprocessing import StandardScaler
 
 
@@ -83,44 +83,62 @@ def check_accel_thread(host):
         data = dev.read()
         xs.append(data[0][0])
         ys.append(data[1][0])
-        zs.append(data[2][0])
+        # zs.append(data[2][0])
 
 
 def check_accel_thread_filtered(host, zi):
     dev.start()
     print("Connection established::")
     while True:
-        data = dev.read().flatten()
-        data = np.multiply(data, scaling_array)
-        filtered, zi = lfilter(b[0], b[1], [data[12]], zi=zi)
-        norm = normalize_data(filtered[0])
-        xs.append(data[12])
-        ys.append(filtered[0])
-        zs.append(norm)
+        datao = dev.read().flatten()
+        if datao[12] != 0.0:
+            sas = 0
+        data = np.multiply(datao, scaling_array)
+        filtered, zi = lfilter(b[0], b[1], data, zi=zi, axis=0)
+        norm = normalize_data(filtered)
+        xs.append(datao[12])
+        xf.append(filtered[12])
+        xn.append(norm[12])
+        ys.append(datao[27])
+        yf.append(filtered[27])
+        yn.append(norm[27])
 
 
 def animate(i):
+
     if ys:
         # data = dev.read()
         # ys.append(data[1][0])
-        print(xs[-1], "\t", ys[-1], "\t", zs[-1])
+        # print(xs[-1], "\t", ys[-1], "\t", zs[-1])
         # ys = ys[-100:]
         # Draw x and y lists
         xss = xs[-500:]
+        xsf = xf[-500:]
+        xsn = xn[-500:]
         yss = ys[-500:]
-        zss = zs[-500:]
+        ysf = yf[-500:]
+        ysn = yn[-500:]
         ax.clear()
         ay.clear()
-        az.clear()
+        axf.clear()
+        ayf.clear()
+        axn.clear()
+        ayn.clear()
         ax.plot(xss)
         ay.plot(yss)
-        az.plot(zss)
+        axf.plot(xsf)
+        ayf.plot(ysf)
+        axn.plot(xsn)
+        ayn.plot(ysn)
 
 
 fig = plt.figure()
 xs = []
+xf = []
+xn = []
 ys = []
-zs = []
+yf = []
+yn = []
 scaling_array = np.array([9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000,
                           9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000,
                           9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000,
@@ -140,9 +158,12 @@ dev = create_connection_accel('localhost')
 # standard_scalar.var_ = np.array([67047282117])
 # standard_scalar.scale_ = np.array(np.sqrt(67047282117))
 
-ax = fig.add_subplot(3, 1, 1)
-ay = fig.add_subplot(3, 1, 2)
-az = fig.add_subplot(3, 1, 3)
+ax = fig.add_subplot(3, 2, 1)
+ay = fig.add_subplot(3, 2, 2)
+axf = fig.add_subplot(3, 2, 3)
+ayf = fig.add_subplot(3, 2, 4)
+axn = fig.add_subplot(3, 2, 5)
+ayn = fig.add_subplot(3, 2, 6)
 
 try:
     # acquire_data_thread = threading.Thread(target=check_accel_thread, args=('localhost', ))
