@@ -8,7 +8,7 @@ import numpy as np
 
 def generate_data():
     while True:
-        randomlist = random.sample(range(-10, 30), 2)
+        randomlist = random.sample(range(-10, 10), 2)
         print(randomlist)
         data.append(randomlist)
 
