@@ -3,13 +3,12 @@ import pandas
 import numpy as np
 import pickle
 import pytrigno
-from scipy.signal import butter, filtfilt
-from sklearn.preprocessing import StandardScaler
+from scipy.signal import butter, lfilter_zi, lfilter
 import time
 import threading
 
 
-def create_connection_accl(host):
+def create_connection_imu(host):
     dev = pytrigno.TrignoAccel(channel_range=(0, 62), samples_per_read=1,
                                host=host)
     dev.check_sensor_n_type(sensor_number)
@@ -22,20 +21,12 @@ def create_connection_accl(host):
     return dev
 
 
-def create_standard_scalar():
-    scalar = StandardScaler()
-    scalar.mean_ = np.array([804.68])
-    scalar.var_ = np.array([67047282117])
-    scalar.scale_ = np.array(np.sqrt(scalar.var_))
-    return scalar
-
-
-def smooth_data(data):
+def create_butterworth_filter():
     nyq = 0.5 * sampling_frequency
     low = lowCutoff / nyq
     b = butter(filterOrderIMU, low, btype='low', output='ba')
-    smoothed_data = filtfilt(b[0], b[1], data, method="gust")
-    return smoothed_data
+    z = lfilter_zi(b[0], b[1])
+    return b, z
 
 
 def normalize_data(data):
@@ -48,7 +39,9 @@ def acquire_imu():
     print("Connection established::")
     try:
         while True:
-            data = dev.read().flatten()
+            data = dev.read()
+            # if data[12][0] != 0.0:
+            #     za = 2
             data_s = np.multiply(data, scaling_array)
             imu_data.append(np.concatenate((data_s[9:15], data_s[27:33], data_s[36:42], data_s[45:51],
                                             data_s[54:60]), axis=0))
@@ -57,8 +50,8 @@ def acquire_imu():
         print('Data acquisition stopped')
 
 
-sampling_frequency = 2000
-filterOrderIMU = 1
+sampling_frequency = 148
+filterOrderIMU = 2
 lowCutoff = 1
 avg_mean_training = np.array([-7557.074342, 238.9051397, -7004.522484, 1100.075402, 8357.125645, -3072.610687,
                               -9787.098475, 716.5740751, -2461.864722, 1468.178587, -412.4093905, -1145.956741,
@@ -77,18 +70,27 @@ scaling_array = np.array([9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 100
                           9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000,
                           9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000,
                           9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000])
+
+scaling_array = scaling_array.reshape(-1, 1)
 imu_data = []
 sensor_number = 2
-dev = create_connection_accl('localhost')
+
+b, z = create_butterworth_filter()
+zi={}
+for i in range(31):
+    zi[i] = z
+dev = create_connection_imu('localhost')
+
 print("Loading regression model::")
 # For PS
 # rud_model = pickle.load(open("D:/Chinmay/ML Pipeline/Trained model/mode_0_20201006-104041", "rb"))
 # For RUD
 rud_model = pickle.load(open("D:/Chinmay/ML Pipeline/Trained model/mode_1_20201006-083222", "rb"))
 rud_model.verbose = False
-rud_model.n_jobs=8
+rud_model.n_jobs=15
 print(rud_model.n_estimators, rud_model.max_depth, rud_model.max_features)
 print("Model loaded successfully::")
+
 acquire_data_thread = threading.Thread(target=acquire_imu)
 acquire_data_thread.daemon = True
 acquire_data_thread.start()
@@ -96,10 +98,14 @@ acquire_data_thread.start()
 while True:
     try:
         if imu_data:
-            normalized_data = normalize_data(imu_data[-1])
+            filtered = np.zeros(30)
+            data = imu_data[-1]
+            for i in range(data.shape[0]):
+                filtered[i], zi[i] = lfilter(b[0], b[1], data[i], zi=zi[i])
+            normalized_data = normalize_data(filtered)
             start = time.time()
             predicted_theta_dot = rud_model.predict([normalized_data])
-            print("time to predict:\t", time.time()-start, "\t", imu_data[-1][3], "\t", normalized_data[3], "\t",
+            print("time to predict:\t", time.time()-start, "\t", data[3][0], "\t", filtered[3], "\t", normalized_data[3], "\t",
                   predicted_theta_dot[0])
     except KeyboardInterrupt:
         dev.stop()
