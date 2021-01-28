@@ -34,7 +34,7 @@ def normalize_data(data):
     return n_data
 
 
-def acquire_imu():
+def acquire_imu(zi):
     dev.start()
     print("Connection established::")
     try:
@@ -43,8 +43,12 @@ def acquire_imu():
             # if data[12][0] != 0.0:
             #     za = 2
             data_s = np.multiply(data, scaling_array)
-            imu_data.append(np.concatenate((data_s[9:15], data_s[27:33], data_s[36:42], data_s[45:51],
-                                            data_s[54:60]), axis=0))
+            data = np.concatenate((data_s[9:15], data_s[27:33], data_s[36:42], data_s[45:51],
+                                            data_s[54:60]), axis=0)
+            filtered = np.zeros(30)
+            for i in range(data.shape[0]):
+                filtered[i], zi[i] = lfilter(b[0], b[1], data[i], zi=zi[i])
+            imu_data.append(filtered)
     except KeyboardInterrupt:
         dev.stop()
         print('Data acquisition stopped')
@@ -91,21 +95,17 @@ rud_model.n_jobs=15
 print(rud_model.n_estimators, rud_model.max_depth, rud_model.max_features)
 print("Model loaded successfully::")
 
-acquire_data_thread = threading.Thread(target=acquire_imu)
+acquire_data_thread = threading.Thread(target=acquire_imu, args=(zi, ))
 acquire_data_thread.daemon = True
 acquire_data_thread.start()
 
 while True:
     try:
         if imu_data:
-            filtered = np.zeros(30)
-            data = imu_data[-1]
-            for i in range(data.shape[0]):
-                filtered[i], zi[i] = lfilter(b[0], b[1], data[i], zi=zi[i])
-            normalized_data = normalize_data(filtered)
+            normalized_data = normalize_data(imu_data[-1])
             start = time.time()
             predicted_theta_dot = rud_model.predict([normalized_data])
-            print("time to predict:\t", time.time()-start, "\t", data[3][0], "\t", filtered[3], "\t", normalized_data[3], "\t",
+            print("time to predict:\t", time.time()-start, "\t", imu_data[-3][3], "\t", normalized_data[3], "\t",
                   predicted_theta_dot[0])
     except KeyboardInterrupt:
         dev.stop()

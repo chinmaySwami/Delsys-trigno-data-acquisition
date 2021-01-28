@@ -1,5 +1,5 @@
 import pytrigno
-from time import sleep
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -95,9 +95,12 @@ def check_accel_thread_filtered(host, zi):
             za = 10
         data = np.multiply(datao, scaling_array)
         filtered = np.zeros(36)
+        # start = time.time()
         for i in range(data.shape[0]):
             filtered[i], zi[i] = lfilter(b[0], b[1],  data[i], zi=zi[i])
+        # print("Time to filter: ", time.time() - start)
         norm = normalize_data(np.array(filtered))
+
         xs.append(datao[12])
         xf.append(filtered[12])
         xn.append(norm[12])
