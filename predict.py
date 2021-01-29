@@ -8,6 +8,8 @@ import time
 import threading
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import mujoco_py
+import os
 
 
 def create_connection_imu(host):
@@ -59,8 +61,8 @@ def predict_theta_dot():
             normalized_data = normalize_data(data_read)
             start = time.time()
             predicted_theta_dot = rud_model.predict([normalized_data])
-            print("time to predict:\t", time.time() - start, "\t", data_read[3], "\t", normalized_data[3], "\t",
-                  predicted_theta_dot[0])
+            # print("time to predict:\t", time.time() - start, "\t", data_read[3], "\t", normalized_data[3], "\t",
+            #       predicted_theta_dot[0])
             theta_dot.append(predicted_theta_dot[0])
 
 
@@ -72,6 +74,22 @@ def animate(i):
         ax.plot(xss)
         # ay.plot(yss)
 
+
+
+# def animate_test(i):
+#     if imu_data:
+#         data_read = imu_data[-1]
+#         normalized_data = normalize_data(data_read)
+#         start = time.time()
+#         predicted_theta_dot = rud_model.predict([normalized_data])
+#         print("time to predict:\t", time.time() - start, "\t", data_read[3], "\t", normalized_data[3], "\t",
+#               predicted_theta_dot[0])
+#         theta_dot.append(predicted_theta_dot[0])
+#         xss = theta_dot[-500:]
+#         ax.clear()
+#         # ay.clear()
+#         ax.plot(xss)
+#         # ay.plot(yss)
 
 
 sampling_frequency = 148
@@ -112,7 +130,7 @@ print("Loading regression model::")
 # For RUD
 rud_model = pickle.load(open("D:/Chinmay/ML Pipeline/Trained model/mode_1_20201006-083222", "rb"))
 rud_model.verbose = False
-rud_model.n_jobs=15
+rud_model.n_jobs = 1
 print(rud_model.n_estimators, rud_model.max_depth, rud_model.max_features)
 print("Model loaded successfully::")
 
@@ -122,15 +140,29 @@ ax = fig.add_subplot(2, 1, 1)
 
 try:
     acquire_data_thread = threading.Thread(target=acquire_imu, args=(zi,))
-    acquire_data_thread.daemon = True
-    acquire_data_thread.start()
-
     predict_theta_thread = threading.Thread(target=predict_theta_dot)
+    acquire_data_thread.daemon = True
     predict_theta_thread.daemon = True
+
+    acquire_data_thread.start()
     predict_theta_thread.start()
 
-    ani = animation.FuncAnimation(fig, animate, fargs=(), interval=8)
-    plt.show()
+    mj_path, _ = mujoco_py.utils.discover_mujoco()
+    xml_path = os.path.join(mj_path, 'External Models/MPL/MPL/', 'arm_claw_ADL.xml')
+    model = mujoco_py.load_model_from_path(xml_path)
+    sim = mujoco_py.MjSim(model)
+    rend = mujoco_py.MjViewer(sim)
+
+    while True:
+        rend.render()
+        sim.step()
+        if theta_dot:
+            print("Predicted theta dot: ", theta_dot[-1])
+            sim.data.ctrl[5] = theta_dot[-1]
+
+    # ani = animation.FuncAnimation(fig, animate, fargs=(), interval=6)
+    # plt.show()
+
 except KeyboardInterrupt:
     dev.stop()
     exit(0)
