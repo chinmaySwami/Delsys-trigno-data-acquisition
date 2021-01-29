@@ -136,7 +136,7 @@ def animate(i):
         ayn.plot(ysn)
 
 
-fig = plt.figure()
+
 xs = []
 xf = []
 xn = []
@@ -176,7 +176,7 @@ dev = create_connection_accel('localhost')
 # standard_scalar.mean_ = np.array([804.68])
 # standard_scalar.var_ = np.array([67047282117])
 # standard_scalar.scale_ = np.array(np.sqrt(67047282117))
-
+fig = plt.figure()
 ax = fig.add_subplot(3, 2, 1)
 ay = fig.add_subplot(3, 2, 2)
 axf = fig.add_subplot(3, 2, 3)
