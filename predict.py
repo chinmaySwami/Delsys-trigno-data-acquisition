@@ -6,6 +6,7 @@ import pytrigno
 from scipy.signal import butter, lfilter_zi, lfilter
 import time
 import threading
+import matplotlib.animation as animation
 
 
 def create_connection_imu(host):
@@ -37,21 +38,28 @@ def normalize_data(data):
 def acquire_imu(zi):
     dev.start()
     print("Connection established::")
-    try:
-        while True:
-            data = dev.read()
-            # if data[12][0] != 0.0:
-            #     za = 2
-            data_s = np.multiply(data, scaling_array)
-            data = np.concatenate((data_s[9:15], data_s[27:33], data_s[36:42], data_s[45:51],
-                                            data_s[54:60]), axis=0)
-            filtered = np.zeros(30)
-            for i in range(data.shape[0]):
-                filtered[i], zi[i] = lfilter(b[0], b[1], data[i], zi=zi[i])
-            imu_data.append(filtered)
-    except KeyboardInterrupt:
-        dev.stop()
-        print('Data acquisition stopped')
+    while True:
+        data = dev.read()
+        # if data[12][0] != 0.0:
+        #     za = 2
+        data_s = np.multiply(data, scaling_array)
+        data = np.concatenate((data_s[9:15], data_s[27:33], data_s[36:42], data_s[45:51],
+                                        data_s[54:60]), axis=0)
+        filtered = np.zeros(30)
+        for i in range(data.shape[0]):
+            filtered[i], zi[i] = lfilter(b[0], b[1], data[i], zi=zi[i])
+        imu_data.append(filtered)
+
+
+def predict_theta_dot():
+    while True:
+        if imu_data:
+            normalized_data = normalize_data(imu_data[-1])
+            start = time.time()
+            predicted_theta_dot = rud_model.predict([normalized_data])
+            print("time to predict:\t", time.time() - start, "\t", imu_data[-3][3], "\t", normalized_data[3], "\t",
+                  predicted_theta_dot[0])
+            theta_dot.append(predicted_theta_dot[0])
 
 
 sampling_frequency = 148
@@ -77,6 +85,7 @@ scaling_array = np.array([9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 100
 
 scaling_array = scaling_array.reshape(-1, 1)
 imu_data = []
+theta_dot=[]
 sensor_number = 2
 
 b, z = create_butterworth_filter()
@@ -95,21 +104,21 @@ rud_model.n_jobs=15
 print(rud_model.n_estimators, rud_model.max_depth, rud_model.max_features)
 print("Model loaded successfully::")
 
-acquire_data_thread = threading.Thread(target=acquire_imu, args=(zi, ))
-acquire_data_thread.daemon = True
-acquire_data_thread.start()
+try:
+    acquire_data_thread = threading.Thread(target=acquire_imu, args=(zi,))
+    acquire_data_thread.daemon = True
+    acquire_data_thread.start()
 
-while True:
-    try:
-        if imu_data:
-            normalized_data = normalize_data(imu_data[-1])
-            start = time.time()
-            predicted_theta_dot = rud_model.predict([normalized_data])
-            print("time to predict:\t", time.time()-start, "\t", imu_data[-3][3], "\t", normalized_data[3], "\t",
-                  predicted_theta_dot[0])
-    except KeyboardInterrupt:
-        dev.stop()
-        exit(0)
+    predict_theta_thread = threading.Thread(target=predict_theta_dot)
+    predict_theta_thread.daemon = True
+    predict_theta_thread.start()
+
+    ani = animation.FuncAnimation(fig, animate, fargs=(), interval=8)
+    plt.show()
+except KeyboardInterrupt:
+    dev.stop()
+    exit(0)
+
 # acquire_imu_predict()
 # save_to_csv()
 print("Finished")
