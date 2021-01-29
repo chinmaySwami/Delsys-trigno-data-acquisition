@@ -6,6 +6,7 @@ import pytrigno
 from scipy.signal import butter, lfilter_zi, lfilter
 import time
 import threading
+import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
 
@@ -54,12 +55,23 @@ def acquire_imu(zi):
 def predict_theta_dot():
     while True:
         if imu_data:
-            normalized_data = normalize_data(imu_data[-1])
+            data_read = imu_data[-1]
+            normalized_data = normalize_data(data_read)
             start = time.time()
             predicted_theta_dot = rud_model.predict([normalized_data])
-            print("time to predict:\t", time.time() - start, "\t", imu_data[-3][3], "\t", normalized_data[3], "\t",
+            print("time to predict:\t", time.time() - start, "\t", data_read[3], "\t", normalized_data[3], "\t",
                   predicted_theta_dot[0])
             theta_dot.append(predicted_theta_dot[0])
+
+
+def animate(i):
+    if theta_dot:
+        xss = theta_dot[-500:]
+        ax.clear()
+        # ay.clear()
+        ax.plot(xss)
+        # ay.plot(yss)
+
 
 
 sampling_frequency = 148
@@ -85,7 +97,7 @@ scaling_array = np.array([9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 100
 
 scaling_array = scaling_array.reshape(-1, 1)
 imu_data = []
-theta_dot=[]
+theta_dot = []
 sensor_number = 2
 
 b, z = create_butterworth_filter()
@@ -103,6 +115,10 @@ rud_model.verbose = False
 rud_model.n_jobs=15
 print(rud_model.n_estimators, rud_model.max_depth, rud_model.max_features)
 print("Model loaded successfully::")
+
+fig = plt.figure()
+ax = fig.add_subplot(2, 1, 1)
+# ay = fig.add_subplot(2, 1, 2)
 
 try:
     acquire_data_thread = threading.Thread(target=acquire_imu, args=(zi,))
