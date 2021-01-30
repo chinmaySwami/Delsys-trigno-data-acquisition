@@ -2,3 +2,4 @@ Tests/
 __pycache__/
 .idea/
 *.xml
+mujoco.py

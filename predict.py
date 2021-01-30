@@ -47,7 +47,7 @@ def acquire_imu(zi):
         #     za = 2
         data_s = np.multiply(data, scaling_array)
         data = np.concatenate((data_s[9:15], data_s[27:33], data_s[36:42], data_s[45:51],
-                                        data_s[54:60]), axis=0)
+                               data_s[54:60]), axis=0)
         filtered = np.zeros(30)
         for i in range(data.shape[0]):
             filtered[i], zi[i] = lfilter(b[0], b[1], data[i], zi=zi[i])
@@ -61,8 +61,8 @@ def predict_theta_dot():
             normalized_data = normalize_data(data_read)
             start = time.time()
             predicted_theta_dot = rud_model.predict([normalized_data])
-            # print("time to predict:\t", time.time() - start, "\t", data_read[3], "\t", normalized_data[3], "\t",
-            #       predicted_theta_dot[0])
+            print("time to predict:\t", time.time() - start, "\t", data_read[3], "\t", normalized_data[3], "\t",
+                  predicted_theta_dot[0])
             theta_dot.append(predicted_theta_dot[0])
 
 
@@ -73,7 +73,6 @@ def animate(i):
         # ay.clear()
         ax.plot(xss)
         # ay.plot(yss)
-
 
 
 # def animate_test(i):
@@ -101,10 +100,10 @@ avg_mean_training = np.array([-7557.074342, 238.9051397, -7004.522484, 1100.0754
                               -4494.225019, -454.6410738, -1114.837898, 3616.154164, 7812.728116, 879.4170656,
                               4581.595772, -1112.281237, -1521.265704, 498.9367503, 8031.761407, 3475.425272])
 avg_std_training = np.array([3899.100149, 514.3201803, 4127.585205, 23852.0515, 74641.24657, 30605.56797, 3006.187073,
-                            644.0836957, 4982.276768, 19552.98379, 79514.72385, 32777.61901, 1990.689673, 830.3656838,
-                            2630.36271, 35482.23785, 79879.04171, 16961.90462, 1422.30238, 412.355329, 3258.372477,
-                            16624.68747, 35696.7495, 19250.84621, 1370.720671, 374.9487406, 3091.811698, 18509.75631,
-                            19317.85871, 21869.72258])
+                             644.0836957, 4982.276768, 19552.98379, 79514.72385, 32777.61901, 1990.689673, 830.3656838,
+                             2630.36271, 35482.23785, 79879.04171, 16961.90462, 1422.30238, 412.355329, 3258.372477,
+                             16624.68747, 35696.7495, 19250.84621, 1370.720671, 374.9487406, 3091.811698, 18509.75631,
+                             19317.85871, 21869.72258])
 scaling_array = np.array([9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000,
                           9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000,
                           9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000,
@@ -119,7 +118,7 @@ theta_dot = []
 sensor_number = 2
 
 b, z = create_butterworth_filter()
-zi={}
+zi = {}
 for i in range(31):
     zi[i] = z
 dev = create_connection_imu('localhost')
@@ -149,16 +148,23 @@ try:
 
     mj_path, _ = mujoco_py.utils.discover_mujoco()
     xml_path = os.path.join(mj_path, 'External Models/MPL/MPL/', 'arm_claw_ADL.xml')
+    print(mj_path, xml_path)
     model = mujoco_py.load_model_from_path(xml_path)
     sim = mujoco_py.MjSim(model)
     rend = mujoco_py.MjViewer(sim)
 
     while True:
-        rend.render()
-        sim.step()
         if theta_dot:
-            print("Predicted theta dot: ", theta_dot[-1])
-            sim.data.ctrl[5] = theta_dot[-1]
+            # print("Predicted theta dot: ", theta_dot[-1])
+            # print("Current theta dot: ", sim.data.ctrl[5])
+            theta = theta_dot[-1]
+            if 1.0 > theta > -1.0:
+                sim.data.ctrl[5] = 0
+            else:
+                sim.data.ctrl[5] = theta
+            # time.sleep(1./25)
+            sim.step()
+            rend.render()
 
     # ani = animation.FuncAnimation(fig, animate, fargs=(), interval=6)
     # plt.show()
