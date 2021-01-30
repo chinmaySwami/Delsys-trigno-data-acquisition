@@ -158,7 +158,7 @@ try:
             # print("Predicted theta dot: ", theta_dot[-1])
             # print("Current theta dot: ", sim.data.ctrl[5])
             theta = theta_dot[-1]
-            if 1.0 > theta > -1.0:
+            if 5.0 > theta > -5.0:
                 sim.data.ctrl[5] = 0
             else:
                 sim.data.ctrl[5] = theta
