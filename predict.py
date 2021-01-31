@@ -62,7 +62,8 @@ def predict_theta_dot():
             data_read = imu_data[-1]
             normalized_data = normalize_data(data_read)
             start = time.time()
-            movement_class = classifier.predict(normalized_data.reshape(-1,1))
+            movement_class = classifier.predict(normalized_data.reshape(-1, 1))
+            movement_class = np.argmax(movement_class, axis=1)
             if movement_class == 1:
                 predicted_theta_dot = rud_model.predict([normalized_data])
             else:
