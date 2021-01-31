@@ -1,3 +1,5 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # or any {'0', '1', '2'}
 import sklearn
 import pandas
 import numpy as np
@@ -9,7 +11,6 @@ import threading
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import mujoco_py
-import os
 from tensorflow import keras
 
 
@@ -61,7 +62,7 @@ def predict_theta_dot():
             data_read = imu_data[-1]
             normalized_data = normalize_data(data_read)
             start = time.time()
-            movement_class = classifier.predict(normalized_data)
+            movement_class = classifier.predict(normalized_data.reshape(-1,1))
             if movement_class == 1:
                 predicted_theta_dot = rud_model.predict([normalized_data])
             else:
@@ -121,7 +122,7 @@ scaling_array = scaling_array.reshape(-1, 1)
 imu_data = []
 theta_dot = []
 sensor_number = 2
-nn_path = 'D:/Chinmay/ML Pipeline/Brace Experiments/Trained weights of optimal precision/saved_classifier_model.pb'
+nn_path = 'D:/Chinmay/ML Pipeline/Trained model/classifier/'
 
 b, z = create_butterworth_filter()
 zi = {}
