@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import mujoco_py
 import os
+from tensorflow import keras
 
 
 def create_connection_imu(host):
@@ -60,10 +61,14 @@ def predict_theta_dot():
             data_read = imu_data[-1]
             normalized_data = normalize_data(data_read)
             start = time.time()
-            predicted_theta_dot = rud_model.predict([normalized_data])
-            print("time to predict:\t", time.time() - start, "\t", data_read[3], "\t", normalized_data[3], "\t",
+            movement_class = classifier.predict(normalized_data)
+            if movement_class == 1:
+                predicted_theta_dot = rud_model.predict([normalized_data])
+            else:
+                predicted_theta_dot = [20]
+            print("time to predict:\t", time.time() - start, "\t", normalized_data[3], "\t", movement_class, "\t",
                   predicted_theta_dot[0])
-            theta_dot.append(predicted_theta_dot[0])
+            theta_dot.append([movement_class, predicted_theta_dot[0]])
 
 
 def animate(i):
@@ -116,12 +121,17 @@ scaling_array = scaling_array.reshape(-1, 1)
 imu_data = []
 theta_dot = []
 sensor_number = 2
+nn_path = 'D:/Chinmay/ML Pipeline/Brace Experiments/Trained weights of optimal precision/saved_classifier_model.pb'
 
 b, z = create_butterworth_filter()
 zi = {}
 for i in range(31):
     zi[i] = z
 dev = create_connection_imu('localhost')
+
+print("Loading NN model: ")
+classifier = keras.models.load_model(nn_path)
+print("Model loaded successfully::")
 
 print("Loading regression model::")
 # For PS
@@ -157,18 +167,23 @@ try:
         if theta_dot:
             # print("Predicted theta dot: ", theta_dot[-1])
             # print("Current theta dot: ", sim.data.ctrl[5])
-            theta = theta_dot[-1]
-            if 5.0 > theta > -5.0:
-                sim.data.ctrl[5] = 0
+            predictions = theta_dot[-1]
+            mov_class = predictions[0]
+            if 5.0 > predictions[1] > -5.0:
+                theta = 0
             else:
-                sim.data.ctrl[5] = theta
+                theta = predictions[1]
             # time.sleep(1./25)
+
+            if mov_class:
+                sim.data.ctrl[6] = theta
+            else:
+                sim.data.ctrl[4] = theta
+
             sim.step()
             rend.render()
-
     # ani = animation.FuncAnimation(fig, animate, fargs=(), interval=6)
     # plt.show()
-
 except KeyboardInterrupt:
     dev.stop()
     exit(0)
