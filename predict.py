@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import mujoco_py
 from tensorflow import keras
+import random
 
 
 def create_connection_imu(host):
@@ -61,16 +62,24 @@ def predict_theta_dot():
         if imu_data:
             data_read = imu_data[-1]
             normalized_data = normalize_data(data_read)
+            normalized_data = normalized_data / 8.8
             start = time.time()
-            movement_class = classifier.predict(normalized_data.reshape(1, -1))
-            movement_class = np.argmax(movement_class, axis=1)
+            movement_class_prob = classifier.predict(normalized_data.reshape(1, 30))
+            movement_class = np.argmax(movement_class_prob, axis=1)
+
             if movement_class == 1:
-                predicted_theta_dot = rud_model.predict([normalized_data])
+                if use_rf:
+                    predicted_theta_dot = rud_model.predict([normalized_data])
+                else:
+                    predicted_theta_dot = [random.choice([-5, 5])]
             else:
-                predicted_theta_dot = [0.2]
-            print("time to predict:\t", time.time() - start, "\t", normalized_data[3], "\t", movement_class, "\t",
-                  predicted_theta_dot[0])
-            theta_dot.append([movement_class, predicted_theta_dot[0]])
+                if use_rf:
+                    predicted_theta_dot = ps_model.predict([normalized_data])
+                else:
+                    predicted_theta_dot = [random.choice([-5, 5])]
+            print("time to predict:\t", time.time() - start, "\t", normalized_data[3], "\t", movement_class_prob, "\t",
+                  movement_class[0], "\t", predicted_theta_dot[0])
+            theta_dot.append([movement_class[0], predicted_theta_dot[0]])
 
 
 def animate(i):
@@ -123,6 +132,7 @@ scaling_array = scaling_array.reshape(-1, 1)
 imu_data = []
 theta_dot = []
 sensor_number = 2
+use_rf = True
 nn_path = 'D:/Chinmay/ML Pipeline/Trained model/classifier/'
 
 b, z = create_butterworth_filter()
@@ -135,15 +145,20 @@ print("Loading NN model: ")
 classifier = keras.models.load_model(nn_path)
 print("Model loaded successfully::")
 
-print("Loading regression model::")
-# For PS
-# rud_model = pickle.load(open("D:/Chinmay/ML Pipeline/Trained model/mode_0_20201006-104041", "rb"))
-# For RUD
-rud_model = pickle.load(open("D:/Chinmay/ML Pipeline/Trained model/mode_1_20201006-083222", "rb"))
-rud_model.verbose = False
-rud_model.n_jobs = 1
-print(rud_model.n_estimators, rud_model.max_depth, rud_model.max_features)
-print("Model loaded successfully::")
+if use_rf:
+    print("Loading regression model::")
+    # For RUD
+    rud_model = pickle.load(open("D:/Chinmay/ML Pipeline/Trained model/mode_1_20201006-083222", "rb"))
+    rud_model.verbose = False
+    rud_model.n_jobs = 1
+    print("RUD Model loaded successfully::")
+
+    # For PS
+    ps_model = pickle.load(open("D:/Chinmay/ML Pipeline/Trained model/mode_0_20201006-104041", "rb"))
+    ps_model.verbose = False
+    ps_model.n_jobs = 1
+    print("PS Model loaded successfully::")
+
 
 fig = plt.figure()
 ax = fig.add_subplot(2, 1, 1)
@@ -179,7 +194,7 @@ try:
             if mov_class:
                 sim.data.ctrl[6] = theta
             else:
-                sim.data.ctrl[4] = theta
+                sim.data.ctrl[4] = theta + 5
 
             sim.step()
             rend.render()
