@@ -57,23 +57,51 @@ def acquire_imu(zi):
         imu_data.append(filtered)
 
 
+def iterative_gain(lst, prev_theta, prev_aug_theta, gain):
+    aug_lst = []
+    initiated_gain = False
+    for index in range(len(lst)):
+        if abs(prev_theta) <= abs(lst[index]):
+            # aug_val = df.at[index, 'Beta Dot (Degrees/sec)'] + (df.at[index, 'Beta Dot (Degrees/sec)'] * 0.15)
+            aug_val = lst[index] * gain
+            if abs(aug_val) <= 200.0:  # for PS 200, DTM
+                aug_lst.append(aug_val)
+                if gain <= 2:
+                    gain += 0.00008  # for PS :: 0.00008, DTM: 0.00025
+            else:
+                aug_lst.append(aug_val - (aug_val - prev_aug_theta))
+        else:
+            gain -= 0.00008
+            if gain <= 1:
+                gain = 1
+            aug_val = lst[index] * gain
+            # aug_lst.append(lst[index])
+            aug_lst.append(aug_val)
+
+        prev_aug_theta = aug_lst[index]
+        prev_theta = lst[index]
+    hc_aug = lst * hc_val
+
+    return aug_lst, hc_aug
+
+
 def predict_theta_dot():
     while True:
         if imu_data:
             data_read = imu_data[-1]
             normalized_data = normalize_data(data_read)
-            normalized_data = normalized_data / 8.8
+            normalized_data = normalized_data / 9
             start = time.time()
             movement_class_prob = classifier.predict(normalized_data.reshape(1, 30))
             movement_class = np.argmax(movement_class_prob, axis=1)
 
             if movement_class == 1:
-                if use_rf:
+                if use_rf_rud:
                     predicted_theta_dot = rud_model.predict([normalized_data])
                 else:
-                    predicted_theta_dot = [random.choice([-5, 5])]
+                    predicted_theta_dot = [random.choice([-4, 4])]
             else:
-                if use_rf:
+                if use_rf_ps:
                     predicted_theta_dot = ps_model.predict([normalized_data])
                 else:
                     predicted_theta_dot = [random.choice([-5, 5])]
@@ -89,22 +117,6 @@ def animate(i):
         # ay.clear()
         ax.plot(xss)
         # ay.plot(yss)
-
-
-# def animate_test(i):
-#     if imu_data:
-#         data_read = imu_data[-1]
-#         normalized_data = normalize_data(data_read)
-#         start = time.time()
-#         predicted_theta_dot = rud_model.predict([normalized_data])
-#         print("time to predict:\t", time.time() - start, "\t", data_read[3], "\t", normalized_data[3], "\t",
-#               predicted_theta_dot[0])
-#         theta_dot.append(predicted_theta_dot[0])
-#         xss = theta_dot[-500:]
-#         ax.clear()
-#         # ay.clear()
-#         ax.plot(xss)
-#         # ay.plot(yss)
 
 
 sampling_frequency = 148
@@ -132,12 +144,15 @@ scaling_array = scaling_array.reshape(-1, 1)
 imu_data = []
 theta_dot = []
 sensor_number = 2
-use_rf = True
+use_rf_ps = True
+use_rf_rud = True
 nn_path = 'D:/Chinmay/ML Pipeline/Trained model/classifier/'
 
 b, z = create_butterworth_filter()
 zi = {}
-for i in range(31):
+
+# index number 31 in zi is for PS and 32 is for RUD
+for i in range(33):
     zi[i] = z
 dev = create_connection_imu('localhost')
 
@@ -145,7 +160,7 @@ print("Loading NN model: ")
 classifier = keras.models.load_model(nn_path)
 print("Model loaded successfully::")
 
-if use_rf:
+if use_rf_rud:
     print("Loading regression model::")
     # For RUD
     rud_model = pickle.load(open("D:/Chinmay/ML Pipeline/Trained model/mode_1_20201006-083222", "rb"))
@@ -153,11 +168,13 @@ if use_rf:
     rud_model.n_jobs = 1
     print("RUD Model loaded successfully::")
 
+if use_rf_ps:
     # For PS
+    start = time.time()
     ps_model = pickle.load(open("D:/Chinmay/ML Pipeline/Trained model/mode_0_20201006-104041", "rb"))
     ps_model.verbose = False
     ps_model.n_jobs = 1
-    print("PS Model loaded successfully::")
+    print("PS Model loaded successfully:: ", time.time()-start)
 
 
 fig = plt.figure()
@@ -186,15 +203,22 @@ try:
             # print("Current theta dot: ", sim.data.ctrl[5])
             predictions = theta_dot[-1]
             mov_class = predictions[0]
-            if 5.0 > predictions[1] > -5.0:
-                theta = 0
-            else:
-                theta = predictions[1]
+
             # time.sleep(1./25)
             if mov_class:
+                if 5.0 > predictions[1] > -5.0:
+                    theta = 0
+                else:
+                    theta, zi[32] = lfilter(b[0], b[1], [predictions[1]], zi=zi[32])
+                    # theta = theta * 1.5
                 sim.data.ctrl[6] = theta
             else:
-                sim.data.ctrl[4] = theta + 5
+                if 10.0 > predictions[1] > -10.0:
+                    theta = 0
+                else:
+                    theta, zi[31] = lfilter(b[0], b[1], [predictions[1]], zi=zi[31])
+                    theta = theta * 1.5
+                sim.data.ctrl[4] = theta
 
             sim.step()
             rend.render()
