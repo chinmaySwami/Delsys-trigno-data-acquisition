@@ -30,6 +30,19 @@ def create_connection_imu(host):
     return dev
 
 
+def create_connection_EMG(host):
+    dev = pytrigno.TrignoEMG(channel_range=(0, 15), samples_per_read=1,
+                               host=host)
+    dev.check_sensor_n_type(sensor_number)
+    dev.check_sensor_n_mode(sensor_number)
+    dev.check_sensor_n_start_index(sensor_number)
+    dev.check_sensor_n_auxchannel_count(sensor_number)
+    dev.check_sensor_channel_unit(sensor_number, 1)
+    dev.check_sensor_channel_unit(sensor_number, 4)
+    dev.check_sensor_channel_unit(sensor_number, 7)
+    return dev
+
+
 def create_butterworth_filter():
     nyq = 0.5 * sampling_frequency
     low = lowCutoff / nyq
@@ -53,11 +66,23 @@ def acquire_imu(zi):
         data_s = np.multiply(data, scaling_array)
         data = np.concatenate((data_s[9:15], data_s[27:33], data_s[36:42], data_s[45:51],
                                data_s[54:60]), axis=0)
-        # filtered = np.zeros(30)
-        # for i in range(data.shape[0]):
-        #     filtered[i], zi[i] = lfilter(b[0], b[1], data[i], zi=zi[i])
-        # imu_data.append(filtered)
-        imu_data.append(data.reshape(1, -1)[0])
+        filtered = np.zeros(30)
+        for i in range(data.shape[0]):
+            filtered[i], zi[i] = lfilter(b[0], b[1], data[i], zi=zi[i])
+        imu_data.append(filtered)
+
+
+def acquire_EMG(zi_emg):
+    dev_EMG.start()
+    print("Connection established::")
+    while True:
+        data = dev_EMG.read()
+        filtered = np.zeros(16)
+        for i in range(data.shape[0]):
+            aew, asw = lfilter(b[0], b[1], data[i], zi=zi_emg[i])
+        for i in range(data.shape[0]):
+            filtered[i], zi_emg[i] = lfilter(b[0], b[1], data[i], zi=zi_emg[i])
+        EMG_data.append(np.absolute(filtered))
 
 
 # def iterative_gain(lst, prev_theta, prev_aug_theta, gain):
@@ -94,10 +119,11 @@ def predict_theta_dot():
             data_read = imu_data[-1]
             normalized_data = normalize_data(data_read)
             # 8 for 3 class classifier
-            normalized_data = normalized_data / 2
+            normalized_data = normalized_data / 1.5
             start = time.time()
             movement_class_prob = classifier.predict(normalized_data.reshape(1, 30))
             movement_class = np.argmax(movement_class_prob, axis=1)
+
             if movement_class == 1:
                 if use_rf_rud:
                     predicted_theta_dot = rud_model.predict([normalized_data])
@@ -113,6 +139,20 @@ def predict_theta_dot():
             print("time to predict:\t", time.time() - start, "\t", normalized_data[3], "\t", movement_class_prob, "\t",
                   movement_class[0], "\t", predicted_theta_dot[0])
             theta_dot.append([movement_class[0], predicted_theta_dot[0]])
+
+
+def predict_grasping():
+    while True:
+        if EMG_data:
+            data = EMG_data[-1]
+            data = np.multiply(data, scaling_array_emg)
+            data = np.concatenate((np.array([data[1]]), data[3:5]), axis=0)
+            data = data[2]
+            print("Sum of Data: ", data)
+            if abs(data) > 5:
+                grasp_pred.append(1)
+            else:
+                grasp_pred.append(0)
 
 
 def animate(i):
@@ -144,30 +184,36 @@ scaling_array = np.array([9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 100
                           9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000,
                           9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000,
                           9806.65, 9806.65, 9806.65, 1000, 1000, 1000, 1000, 1000, 1000])
-
 scaling_array = scaling_array.reshape(-1, 1)
-imu_data = []
-theta_dot = []
-sensor_number = 2
-use_rf_ps = True
-use_rf_rud = True
-nn_path = 'D:/Chinmay/Wrist Control Offline/saved classifier/2_class_PSDTM'
+scaling_array_emg = np.array([100000.0, 100000.0, 100000.0, 100000.0, 100000.0, 100000.0, 100000.0, 100000.0, 100000.0,
+                          100000.0, 100000.0, 100000.0, 100000.0, 100000.0, 100000.0, 100000.0])
+# scaling_array_emg = scaling_array_emg.reshape(-1, 1)
 
-mj_path, _ = mujoco_py.utils.discover_mujoco()
-# mj_path = 'C:\\mujoco\\mujoco200\\'
-xml_path = os.path.join(mj_path, 'External Models/MPL/MPL/', 'arm_claw_ADL.xml')
-print(mj_path, xml_path)
-model = mujoco_py.load_model_from_path(xml_path)
+imu_data = []
+EMG_data = []
+theta_dot = []
+grasp_pred = []
+grasp_status = False
+sensor_number = 2
+use_rf_ps = False
+use_rf_rud = False
+nn_path = 'D:/Chinmay/Wrist Control Offline/saved classifier/2_class_PSDTM'
 
 classification_queue = deque()
 
 b, z = create_butterworth_filter()
 zi = {}
+zi_emg = {}
 
 # index number 31 in zi is for PS and 32 is for RUD
 for i in range(33):
     zi[i] = z
-dev = create_connection_imu('localhost')
+
+for i in range(16):
+    zi_emg[i] = z
+
+# dev = create_connection_imu('localhost')
+dev_EMG = create_connection_EMG('localhost')
 
 print("Loading NN model: ")
 classifier = keras.models.load_model(nn_path)
@@ -180,7 +226,6 @@ if use_rf_rud:
     rud_model.verbose = False
     rud_model.n_jobs = 1
     print("RUD Model loaded successfully::")
-    time.sleep(5)
 
 if use_rf_ps:
     # For PS
@@ -196,55 +241,37 @@ ax = fig.add_subplot(2, 1, 1)
 # ay = fig.add_subplot(2, 1, 2)
 
 try:
-    acquire_data_thread = threading.Thread(target=acquire_imu, args=(zi,))
-    predict_theta_thread = threading.Thread(target=predict_theta_dot)
-    acquire_data_thread.daemon = True
-    predict_theta_thread.daemon = True
+    # acquire_data_thread = threading.Thread(target=acquire_imu, args=(zi,))
+    acquire_EMG_data_thread = threading.Thread(target=acquire_EMG, args=(zi_emg,))
+    predict_grasp_thread = threading.Thread(target=predict_grasping)
+    # predict_theta_thread = threading.Thread(target=predict_theta_dot)
 
-    acquire_data_thread.start()
-    predict_theta_thread.start()
+    # acquire_data_thread.daemon = True
+    acquire_EMG_data_thread.daemon = True
+    predict_grasp_thread.daemon = True
+    # predict_theta_thread.daemon = True
 
+    # acquire_data_thread.start()
+    acquire_EMG_data_thread.start()
+    predict_grasp_thread.start()
+    # predict_theta_thread.start()
 
+    mj_path, _ = mujoco_py.utils.discover_mujoco()
+    xml_path = os.path.join(mj_path, 'External Models/MPL/MPL/', 'arm_claw_ADL.xml')
+    print(mj_path, xml_path)
+    model = mujoco_py.load_model_from_path(xml_path)
     sim = mujoco_py.MjSim(model)
     rend = mujoco_py.MjViewer(sim)
 
     while True:
-        if theta_dot:
-            # print("Predicted theta dot: ", theta_dot[-1])
-            # print("Current theta dot: ", sim.data.ctrl[5])
-            predictions = theta_dot[-1]
-            mov_class = predictions[0]
-
-            # if len(classification_queue) > 3:
-            #     classification_queue.popleft()
-            # classification_queue.append(mov_class)
-            #
-            # data = Counter(classification_queue)
-            # mov_class = data.most_common(1)
-
-            # time.sleep(1./25)
+        if grasp_pred:
+            mov_class = grasp_pred[-1]
             if mov_class:
-                if 5.0 > predictions[1] > -5.0:
-                    theta = 0
-                else:
-                    # theta, zi[32] = lfilter(b[0], b[1], [predictions[1]], zi=zi[32])
-                    theta = predictions[1]
-                    if theta > 0:
-                        theta = theta - 5
-                    else:
-                        theta = theta + 5
-                sim.data.ctrl[6] = theta
+                sim.data.ctrl[8] = -1.0
+                sim.data.ctrl[7] = 1.0
             else:
-                if 15.0 > predictions[1] > -15.0:
-                    theta = 0
-                else:
-                    # theta, zi[31] = lfilter(b[0], b[1], [predictions[1]], zi=zi[31])
-                    theta = predictions[1]
-                    if theta > 0:
-                        theta = theta - 5
-                    else:
-                        theta = theta + 5
-                sim.data.ctrl[4] = theta
+                sim.data.ctrl[8] = 1.0
+                sim.data.ctrl[7] = -1.0
 
             sim.step()
             rend.render()
@@ -252,6 +279,7 @@ try:
     # plt.show()
 except KeyboardInterrupt:
     dev.stop()
+    dev_EMG.stop()
     exit(0)
 
 # acquire_imu_predict()
